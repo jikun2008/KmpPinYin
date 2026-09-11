@@ -57,8 +57,11 @@ kotlin {
             implementation(libs.compose.uiTooling)
         }
         commonMain.dependencies {
-            api(project(":libs:tinypinyin-kt"))
-            api(project(":libs:lexicons-cncity"))
+//            api(project(":libs:tinypinyin-kt"))
+//            api(project(":libs:lexicons-cncity"))
+            implementation("com.github.jikun2008.KmpPinYin:tinypinyin-kt:0.1.0")
+            // 可选：中文地名词典（多音字修正）
+            implementation("com.github.jikun2008.KmpPinYin:lexicons-cncity:0.1.0")
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
