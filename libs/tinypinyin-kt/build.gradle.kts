@@ -15,7 +15,10 @@ kotlin {
     // These targets only publish the resolved commonMain artifacts.
     android {
         namespace = "com.github.kmppy.tinypinyin"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        // 固定 36 而不跟随 libs.versions.android.compileSdk（现为 37）：
+        // 本库纯 Kotlin、不依赖 Compose，无 minCompileSdk=37 约束，
+        // 这样 JitPack 构建机不必安装 SDK Platform 37。
+        compileSdk = 36
         minSdk = libs.versions.android.minSdk.get().toInt()
 
         compilerOptions {

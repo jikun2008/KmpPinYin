@@ -151,7 +151,8 @@ JitPack 上发布满 7 天的版本不可覆盖（只读），需要修正请递
 ## Building
 
 在外层工程根目录（`D:\code\KmpPinYin`）执行，Kotlin / AGP / Gradle 版本跟随外层工程
-（当前 Kotlin `2.4.10` + Gradle `9.1.0`）。
+（当前 Kotlin `2.4.10` + AGP `9.1.1` + Gradle `9.3.1`）；两个库的 `compileSdk` 固定为 `36`，
+不跟随示例 App 的 `37`（库不依赖 Compose，无 `minCompileSdk=37` 约束，JitPack 构建机也无需装 SDK Platform 37）。
 
 ```bash
 gradle build                              # compile all targets that run on the current host

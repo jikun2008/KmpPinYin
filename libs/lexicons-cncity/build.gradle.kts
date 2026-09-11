@@ -13,7 +13,8 @@ apply(from = rootProject.file("gradle/jitpack-publishing.gradle.kts"))
 kotlin {
     android {
         namespace = "com.github.kmppy.lexicons.cncity"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        // 与 :libs:tinypinyin-kt 保持一致，固定 36，不依赖 SDK Platform 37。
+        compileSdk = 36
         minSdk = libs.versions.android.minSdk.get().toInt()
 
         compilerOptions {
