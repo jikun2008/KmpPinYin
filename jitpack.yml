@@ -16,4 +16,4 @@ install:
   #   （本库全部实现都在 commonMain，无 cinterop / 无 framework，交叉编译可行；
   #    消费者只需 klib，链接仍在其本机 Xcode 侧完成）
   # 内存参数覆盖 gradle.properties 的 4G/3G，避免共享构建机上起不来 JVM
-  - "./gradlew --no-daemon -PskipExampleApps -Pkotlin.native.enableKlibsCrossCompilation=true -Dorg.gradle.jvmargs=-Xmx3072m -Dfile.encoding=UTF-8 -Pkotlin.daemon.jvmargs=-Xmx2048M :libs:tinypinyin-kt:publishToMavenLocal :libs:lexicons-cncity:publishToMavenLocal"
+  - "sh ./gradlew --no-daemon -PskipExampleApps -Pkotlin.native.enableKlibsCrossCompilation=true -Dorg.gradle.jvmargs=-Xmx3072m -Dfile.encoding=UTF-8 -Pkotlin.daemon.jvmargs=-Xmx2048M :libs:tinypinyin-kt:publishToMavenLocal :libs:lexicons-cncity:publishToMavenLocal"
