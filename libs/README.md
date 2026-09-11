@@ -1,5 +1,7 @@
 # KmpPinYin (libs)
 
+[![Release](https://jitpack.io/v/jikun2008/KmpPinYin.svg)](https://jitpack.io/#jikun2008/KmpPinYin)
+
 > 本目录代码由独立工程 `D:\workcode\KmpPinYin` 迁入，作为 Gradle 子项目 `:libs:tinypinyin-kt`、
 > `:libs:lexicons-cncity`、`:libs:generator` 参与构建；外层工程（androidApp / desktopApp /
 > webApp / iosApp / shared）只用于多端功能验证。
@@ -65,13 +67,51 @@ Pinyin.toPinyin("我去重庆")  // "wo3 qu4 chong2 qing4"
 
 ## Add to your project
 
-Declare the dependency for your targets, e.g.:
+两个库通过 **JitPack** 分发（按需从 GitHub tag 构建，无需本地上传）。
+
+1) 添加仓库：
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+```
+
+2) 添加依赖。KMP 工程在 `commonMain` 写根坐标即可，Gradle 会按 target 自动挑平台产物：
 
 ```kotlin
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            // 在本仓库内直接引用模块（外层 shared 模块就是这么接的）
+            implementation("com.github.jikun2008.KmpPinYin:tinypinyin-kt:0.1.0")
+            // 可选：中文地名词典（多音字修正）
+            implementation("com.github.jikun2008.KmpPinYin:lexicons-cncity:0.1.0")
+        }
+    }
+}
+```
+
+纯 JVM / Android 工程也可以直接引用带后缀的模块：
+`com.github.jikun2008.KmpPinYin:tinypinyin-kt-jvm:0.1.0`（JAR）、
+`com.github.jikun2008.KmpPinYin:tinypinyin-kt-android:0.1.0`（AAR）。
+
+已发布 target：JVM、Android（AAR）、iOS（`iosArm64` / `iosX64` / `iosSimulatorArm64` klib）、
+macOS（`macosArm64` / `macosX64` klib）、JS、WasmJs。全部逻辑都在 `commonMain`，各 target 产物等价。
+
+> JitPack 只在 Linux 构建机上执行构建，Apple target 的 klib 靠 Kotlin/Native 交叉编译产出
+> （本库无 cinterop、无 framework 二进制，满足交叉编译条件），消费者拿到的仍然是 klib，
+> 真正的链接仍在使用方的 macOS/Xcode 侧完成。
+
+本仓库内部的 `shared` 模块保持源码依赖，不走 JitPack：
+
+```kotlin
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
             api(project(":libs:tinypinyin-kt"))
             // optional: api(project(":libs:lexicons-cncity"))
         }
@@ -79,7 +119,34 @@ kotlin {
 }
 ```
 
-Android consumers can depend on the `jvm`/AAR variant; all logic is in shared `commonMain`.
+## Publishing（发新版本到 JitPack）
+
+坐标与版本集中在 `gradle.properties`：`GROUP_ID=com.github.jikun2008.KmpPinYin`、
+`VERSION_NAME=<版本号>`。`group` 不能随意改：JitPack 会按 `com.github.<用户>.<仓库>` 反推源码仓库；
+`VERSION_NAME` 必须与 GitHub **tag 名完全一致**，否则消费者按 tag 取版本时会 404。
+
+1. 改 `gradle.properties` 的 `VERSION_NAME`（如 `0.1.0` → `0.2.0`）并提交。
+2. 打上同名 tag（不带 `v` 前缀）并推送：
+
+   ```bash
+   git tag 0.2.0
+   git push origin main --tags
+   ```
+
+3. 打开 <https://jitpack.io/#jikun2008/KmpPinYin> → `Look up` → 对应版本点 `Get it`；
+   首次请求触发远端构建，绿色 log 表示成功，红色 log 点进去看 `build.log` 排错。
+4. 远端构建命令由根目录 [jitpack.yml](../jitpack.yml) 指定：只跑
+   `:libs:tinypinyin-kt:publishToMavenLocal :libs:lexicons-cncity:publishToMavenLocal`，
+   并用 `-PskipExampleApps` 把 `shared` 与示例 App 排除在 settings 之外（见
+   [settings.gradle.kts](../settings.gradle.kts)）。
+
+本地预检（不依赖网络，产物落在 `~/.m2`，注意 `settings.xml` 可能把本地仓库改到别处）：
+
+```bash
+./gradlew :libs:tinypinyin-kt:publishToMavenLocal -PskipExampleApps
+```
+
+JitPack 上发布满 7 天的版本不可覆盖（只读），需要修正请递增版本号重新发布。
 
 ## Building
 

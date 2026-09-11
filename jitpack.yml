@@ -1,0 +1,19 @@
+# JitPack 构建配置（JitPack 只在 Linux 构建机上执行，文档见 https://jitpack.io/docs/BUILDING/）
+#
+# 不写这份文件时，JitPack 会在仓库根执行 gradlew publishToMavenLocal，
+# 那会连带构建 shared / androidApp / desktopApp / webApp（Compose、示例 App 的 SDK 依赖），
+# 既慢又容易因为无关模块失败。这里把构建范围收敛到 :libs 下的两个库。
+jdk:
+  - openjdk17
+
+before_install:
+  # 本地 wrapper 指向腾讯云 Gradle 镜像，境外访问不稳定；只在这次 checkout 里改回官方分发地址。
+  - "sed -i 's|mirrors.cloud.tencent.com/gradle|services.gradle.org/distributions|' gradle/wrapper/gradle-wrapper.properties"
+
+install:
+  # -PskipExampleApps：settings.gradle.kts 里据此排除示例 App 与 shared 模块
+  # -Pkotlin.native.enableKlibsCrossCompilation：Linux 上交叉编译 ios/macos 的 klib
+  #   （本库全部实现都在 commonMain，无 cinterop / 无 framework，交叉编译可行；
+  #    消费者只需 klib，链接仍在其本机 Xcode 侧完成）
+  # 内存参数覆盖 gradle.properties 的 4G/3G，避免共享构建机上起不来 JVM
+  - "./gradlew --no-daemon -PskipExampleApps -Pkotlin.native.enableKlibsCrossCompilation=true -Dorg.gradle.jvmargs=-Xmx3072m -Dfile.encoding=UTF-8 -Pkotlin.daemon.jvmargs=-Xmx2048M :libs:tinypinyin-kt:publishToMavenLocal :libs:lexicons-cncity:publishToMavenLocal"

@@ -4,10 +4,11 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidMultiplatformLibrary)
+    id("maven-publish")
 }
 
-group = "com.github.kmppy"
-version = "0.1.0"
+description = "Fast, low-memory Chinese-to-Pinyin library for Kotlin Multiplatform (TinyPinyin compatible, with tone output and polyphone dictionaries)."
+apply(from = rootProject.file("gradle/jitpack-publishing.gradle.kts"))
 
 kotlin {
     // All implementation lives in commonMain (pure Kotlin, no expect/actual).

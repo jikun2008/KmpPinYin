@@ -8,6 +8,9 @@ This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM
   - [lexicons-cncity](./libs/lexicons-cncity/src) 地名词典（多音字修正），模块 `:libs:lexicons-cncity`。
   - [generator](./libs/generator) 离线 JVM 生成器，重新生成 `PinyinTable.kt`，模块 `:libs:generator`。
   详见 [libs/README.md](./libs/README.md)。
+  其中 `tinypinyin-kt` / `lexicons-cncity` 已通过 [JitPack](https://jitpack.io/#jikun2008/KmpPinYin)
+  发布，外部工程可直接依赖 `com.github.jikun2008.KmpPinYin:tinypinyin-kt:<tag>`（发布流程见
+  [libs/README.md](./libs/README.md) 的 Publishing 一节与根目录 [jitpack.yml](./jitpack.yml)）。
 
 * [/shared](./shared/src) is for code that will be shared across your Compose Multiplatform applications.
   它已依赖上述两个库模块，[App.kt](./shared/src/commonMain/kotlin/com/yisingle/kmppinyin/App.kt)

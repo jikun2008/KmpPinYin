@@ -4,10 +4,11 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidMultiplatformLibrary)
+    id("maven-publish")
 }
 
-group = "com.github.kmppy"
-version = "0.1.0"
+description = "Optional Chinese place-name lexicon for tinypinyin-kt (longest-match polyphone fixes)."
+apply(from = rootProject.file("gradle/jitpack-publishing.gradle.kts"))
 
 kotlin {
     android {
