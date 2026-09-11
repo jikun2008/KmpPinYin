@@ -1,0 +1,9 @@
+package com.yisingle.kmppinyin
+
+class Greeting {
+    private val platform = getPlatform()
+
+    fun greet(): String {
+        return sayHello(platform.name)
+    }
+}

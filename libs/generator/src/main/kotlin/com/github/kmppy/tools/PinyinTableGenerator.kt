@@ -1,0 +1,190 @@
+package com.github.kmppy.tools
+
+import java.io.File
+
+/**
+ * Reads the raw `pinyin-dict.tsv` resource and generates the Kotlin constant file
+ * `PinyinTable.kt` used by the runtime of `:libs:tinypinyin-kt`.
+ *
+ * The encoding is intentionally simple and byte-for-byte reproducible:
+ *  - Each in-range CJK code point becomes a 12-bit code:
+ *        code = ((syllableIndex + 1) shl 3) or tone        // code == 0 means "not mapped"
+ *    where tone is 1..5 (5 = neutral) and syllableIndex is the index into the
+ *    de-duplicated tone-less syllable table.
+ *  - Each 12-bit code is packed into two printable ASCII characters using a
+ *    64-char alphabet (6 bits per char), keeping the generated source pure ASCII.
+ *
+ * Usage:
+ *   ./gradlew :libs:generator:run --args="<absolute-path-to-tinypinyin-kt/commonMain/kotlin>"
+ * If no argument is given it falls back to a path relative to the repo root.
+ */
+private const val ALPHABET =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+private const val EXT_A_START = 0x3400
+private const val EXT_A_END = 0x4DBF
+private const val MAIN_START = 0x4E00
+private const val MAIN_END = 0x9FFF
+
+private data class Entry(val base: String, val tone: Int)
+
+fun main(args: Array<String>) {
+    val outputDir = args.getOrNull(0)
+        ?: "../tinypinyin-kt/src/commonMain/kotlin"
+    val targetDir = File(outputDir, "com/github/kmppy/internal")
+
+    val dict = loadDict()
+
+    // Assign syllable indices deterministically: iterate all in-range code points
+    // in ascending order, register each tone-less syllable on first appearance.
+    val syllables = ArrayList<String>()
+    val syllableIndex = HashMap<String, Int>()
+    val codes = HashMap<Int, Int>() // codePoint -> 12-bit code
+
+    val allCps = (EXT_A_START..EXT_A_END) + (MAIN_START..MAIN_END)
+    for (cp in allCps) {
+        val e = dict[cp] ?: continue
+        val idx = syllableIndex.getOrPut(e.base) {
+            syllables.add(e.base)
+            syllables.size - 1
+        }
+        val code = ((idx + 1) shl 3) or e.tone
+        check(code in 1..4095) { "code overflow for cp=$cp code=$code" }
+        codes[cp] = code
+    }
+
+    val extA = buildRange(codes, EXT_A_START, EXT_A_END)
+    val main = buildRange(codes, MAIN_START, MAIN_END)
+
+    // Self-verify: decoding the produced strings must reproduce the exact codes.
+    verify(extA, EXT_A_START, codes)
+    verify(main, MAIN_START, codes)
+
+    val file = File(targetDir, "PinyinTable.kt")
+    file.parentFile?.mkdirs()
+    file.writeText(render(syllables, extA, main), Charsets.UTF_8)
+
+    println("Wrote ${file.absolutePath}")
+    println("syllables=${syllables.size} extA=${extA.size} main=${main.size} mapped=${codes.size}")
+}
+
+private fun loadDict(): Map<Int, Entry> {
+    val stream = PinyinTableGeneratorResources.javaClass.getResourceAsStream("/pinyin-dict.tsv")
+        ?: error("pinyin-dict.tsv not found on classpath; run tools/bootstrap_raw_data.py first")
+    val dict = HashMap<Int, Entry>()
+    stream.bufferedReader(Charsets.UTF_8).useLines { lines ->
+        for (line in lines) {
+            if (line.isBlank() || line.startsWith("#")) continue
+            val parts = line.split('\t')
+            if (parts.size < 3) continue
+            val cp = parts[0].trim().toIntOrNull() ?: continue
+            val base = parts[1].trim()
+            val tone = parts[2].trim().toIntOrNull() ?: continue
+            if (base.isEmpty()) continue
+            dict[cp] = Entry(base, tone)
+        }
+    }
+    return dict
+}
+
+private fun buildRange(codes: Map<Int, Int>, start: Int, end: Int): ShortArray {
+    val arr = ShortArray(end - start + 1)
+    for (cp in start..end) {
+        codes[cp]?.let { arr[cp - start] = it.toShort() }
+    }
+    return arr
+}
+
+private fun encode(values: ShortArray): String {
+    val sb = StringBuilder(values.size * 2)
+    for (v in values) {
+        val code = v.toInt() and 0xFFFF
+        sb.append(ALPHABET[code ushr 6])
+        sb.append(ALPHABET[code and 0x3F])
+    }
+    return sb.toString()
+}
+
+private fun verify(values: ShortArray, start: Int, codes: Map<Int, Int>) {
+    val s = encode(values)
+    for (i in values.indices) {
+        val hi = ALPHABET.indexOf(s[2 * i])
+        val lo = ALPHABET.indexOf(s[2 * i + 1])
+        val decoded = (hi shl 6) or lo
+        check(decoded == (values[i].toInt() and 0xFFFF)) { "roundtrip mismatch at $start+$i" }
+    }
+    for ((cp, code) in codes) {
+        if (cp in start..values.size + start - 1) {
+            check((values[cp - start].toInt() and 0xFFFF) == code) { "code mismatch cp=$cp" }
+        }
+    }
+}
+
+private fun render(syllables: List<String>, extA: ShortArray, main: ShortArray): String {
+    val sb = StringBuilder()
+    sb.appendLine("package com.github.kmppy.internal")
+    sb.appendLine()
+    sb.appendLine("// ============================================================")
+    sb.appendLine("// GENERATED by :libs:generator - DO NOT EDIT BY HAND.")
+    sb.appendLine("// Source of truth: libs/generator/src/main/resources/pinyin-dict.tsv")
+    sb.appendLine("// Regenerate: ./gradlew :libs:generator:run")
+    sb.appendLine("// ============================================================")
+    sb.appendLine()
+    sb.appendLine("internal object PinyinTable {")
+    sb.appendLine()
+    sb.appendLine("    private const val ALPHABET = \"$ALPHABET\"")
+    sb.appendLine()
+    sb.appendLine("    internal const val EXT_A_START = $EXT_A_START")
+    sb.appendLine("    internal const val EXT_A_END = $EXT_A_END")
+    sb.appendLine("    internal const val MAIN_START = $MAIN_START")
+    sb.appendLine("    internal const val MAIN_END = $MAIN_END")
+    sb.appendLine()
+    sb.appendLine("    /** Tone-less ASCII syllables; 'v' represents u-umlaut (u after n/l). */")
+    sb.appendLine("    private const val SYLLABLES_STRING = \"${syllables.joinToString(" ")}\"")
+    sb.appendLine()
+    sb.appendLine("    private const val EXT_A_TABLE_STRING =")
+    appendWrappedString(sb, encode(extA))
+    sb.appendLine()
+    sb.appendLine("    private const val MAIN_TABLE_STRING =")
+    appendWrappedString(sb, encode(main))
+    sb.appendLine()
+    sb.appendLine("    internal val syllables: Array<String> by lazy { SYLLABLES_STRING.split(\" \").toTypedArray() }")
+    sb.appendLine()
+    sb.appendLine("    private val extATable: ShortArray by lazy { decode(EXT_A_TABLE_STRING) }")
+    sb.appendLine("    private val mainTable: ShortArray by lazy { decode(MAIN_TABLE_STRING) }")
+    sb.appendLine()
+    sb.appendLine("    private fun decode(s: String): ShortArray {")
+    sb.appendLine("        val out = ShortArray(s.length / 2)")
+    sb.appendLine("        for (i in out.indices) {")
+    sb.appendLine("            val hi = ALPHABET.indexOf(s[i * 2])")
+    sb.appendLine("            val lo = ALPHABET.indexOf(s[i * 2 + 1])")
+    sb.appendLine("            out[i] = ((hi shl 6) or lo).toShort()")
+    sb.appendLine("        }")
+    sb.appendLine("        return out")
+    sb.appendLine("    }")
+    sb.appendLine()
+    sb.appendLine("    /** 12-bit packed code for [c]; 0 means \"not covered by the table\". */")
+    sb.appendLine("    internal fun codeOf(c: Char): Int {")
+    sb.appendLine("        val cp = c.code")
+    sb.appendLine("        return when (cp) {")
+    sb.appendLine("            in MAIN_START..MAIN_END -> mainTable[cp - MAIN_START].toInt() and 0xFFFF")
+    sb.appendLine("            in EXT_A_START..EXT_A_END -> extATable[cp - EXT_A_START].toInt() and 0xFFFF")
+    sb.appendLine("            else -> 0")
+    sb.appendLine("        }")
+    sb.appendLine("    }")
+    sb.appendLine("}")
+    return sb.toString()
+}
+
+private fun appendWrappedString(sb: StringBuilder, value: String) {
+    val chunk = 100
+    val lines = value.chunked(chunk)
+    for ((i, part) in lines.withIndex()) {
+        // Kotlin 只接受“运算符在行尾”的续行写法，所以 + 必须放在上一行末尾。
+        val suffix = if (i == lines.lastIndex) "" else " +"
+        sb.appendLine("        \"$part\"$suffix")
+    }
+}
+
+/** Marker object used only for locating the resource on the classpath. */
+private object PinyinTableGeneratorResources
