@@ -1,42 +1,69 @@
 This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM).
 
-* [/iosApp](./iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+### Quick Start — Add the library
 
-* [/libs](./libs) 是从独立工程 `D:\workcode\KmpPinYin` 迁入的拼音库源码，与本工程隔离开：
-  - [tinypinyin-kt](./libs/tinypinyin-kt/src) 核心库（公共 API + 生成的拼音表），Gradle 模块 `:libs:tinypinyin-kt`。
-  - [lexicons-cncity](./libs/lexicons-cncity/src) 地名词典（多音字修正），模块 `:libs:lexicons-cncity`。
-  - [generator](./libs/generator) 离线 JVM 生成器，重新生成 `PinyinTable.kt`，模块 `:libs:generator`。
-  详见 [libs/README.md](./libs/README.md)。
-  其中 `tinypinyin-kt` / `lexicons-cncity` 已通过 [JitPack](https://jitpack.io/#jikun2008/KmpPinYin)
-  发布，外部工程可直接依赖 `com.github.jikun2008.KmpPinYin:tinypinyin-kt:<tag>`（发布流程见
-  [libs/README.md](./libs/README.md) 的 Publishing 一节与根目录 [jitpack.yml](./jitpack.yml)）。
+[![Release](https://jitpack.io/v/jikun2008/KmpPinYin.svg)](https://jitpack.io/#jikun2008/KmpPinYin)
 
-* [/shared](./shared/src) is for code that will be shared across your Compose Multiplatform applications.
-  它已依赖上述两个库模块，[App.kt](./shared/src/commonMain/kotlin/com/yisingle/kmppinyin/App.kt)
-  是一个拼音转换测试台（输入框 + 声调/大小写/分隔符/词典选项 + 逐字对照）。**打开界面即自动跑一轮校验**，
-  不需要手动输入中文，校验数据全部内置在 [PinyinVerifier](./shared/src/commonMain/kotlin/com/yisingle/kmppinyin/PinyinVerifier.kt)：
-  - 27 条内置中文样本（常用词/成语/古诗/人名/地名/多音字/ü 韵母/轻声/儿化/繁体/生僻字/Ext-A/中英数混排），
-    每条比对无调大写、数字调小写、符号调小写三种配置 = 81 条期望断言，叠加 25 条 API 用例和 8 项结构不变量，共 114 条。
-  - 报告**逐条列出被测中文与转换结果**（`中文：…` / `拼音：…`）便于人工复核，失败项额外打印期望值；
-    顶部勾上「只看失败」才收敛为只展示失败条目。
-  - 勾选「启用地名词典」后命中的词**仍然带声调**，并跟随所选声调风格（`我去重庆` →
-    `WO QU CHONG QING` / `wo3 qu4 chong2 qing4` / `wǒ qù chóng qìng`）：词典值尾部写声调数字（如 `CHONG2`），
-    没有数字的老式词典值仍按字面量输出，与上游 TinyPinyin 行为一致。
-  - 期望值不是手写的：由 [shared/tools/gen_pinyin_samples.py](./shared/tools/gen_pinyin_samples.py) 直接从数据源
-    `pinyin-dict.tsv` 独立算出（输出快照见 [samples-out.txt](./shared/tools/samples-out.txt)），与 Kotlin 实现互为对照。
-  - 三个按钮：「全量校验 + 长文本计时」、「逐样本校验 + 计时」（每条样本 100 次转换的 ms / µs每字 / 字每秒）、
-    「校验并计时当前输入」。
-  同一套校验也写成了可回归用例：[PinyinVerifierTest](./shared/src/commonTest/kotlin/com/yisingle/kmppinyin/PinyinVerifierTest.kt)。
-  It contains several subfolders:
-  - [commonMain](./shared/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./shared/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./shared/src/jvmMain/kotlin)
-    folder is the appropriate location.
+`tinypinyin-kt` 和 `lexicons-cncity` 已通过 JitPack 发布，外部 KMP / JVM / Android 工程可直接依赖：
 
-### Running the apps
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+```
+
+```kotlin
+// build.gradle.kts（KMP 工程）
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("com.github.jikun2008.KmpPinYin:tinypinyin-kt:0.1.0")
+            // 可选：中文地名词典（多音字修正）
+            implementation("com.github.jikun2008.KmpPinYin:lexicons-cncity:0.1.0")
+        }
+    }
+}
+
+// 或者在纯 JVM / Android 项目中直接引用平台产物：
+// implementation("com.github.jikun2008.KmpPinYin:tinypinyin-kt-jvm:0.1.0")   // JAR
+// implementation("com.github.jikun2008.KmpPinYin:tinypinyin-kt-android:0.1.0") // AAR
+```
+
+### Code example
+
+```kotlin
+import com.github.kmppy.Pinyin
+import com.github.kmppy.PinyinCase
+import com.github.kmppy.PinyinConfig
+import com.github.kmppy.ToneStyle
+import com.github.kmppy.dict.PinyinMapDict
+
+// 默认：无调，大写
+Pinyin.toPinyin('中')           // "ZHONG"
+Pinyin.isChinese('中')          // true
+Pinyin.toPinyin("中文")          // "ZHONG WEN"
+Pinyin.toPinyin("中文", "")     // "ZHONGWEN"
+
+// 显式配置声调（无全局状态）
+val tone = PinyinConfig(ToneStyle.TONE_MARK, PinyinCase.LOWERCASE)
+Pinyin.toPinyin("中国", " ", tone)  // "zhōng guó"
+
+// 多音字词典（末尾数字表示声调，激活地名词典后仍带声调输出）
+Pinyin.config {
+    toneStyle(ToneStyle.TONE_NUMBER)
+    case(PinyinCase.LOWERCASE)
+    with(PinyinMapDict(mapOf("重庆" to arrayOf("chong2", "qing4"))))
+}
+Pinyin.toPinyin("我去重庆")  // "wo3 qu4 chong2 qing4"
+```
+
+完整文档（发布流程、数据管线、设计说明）见 [libs/README.md](./libs/README.md)。
+
+---
 
 Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:
 
@@ -51,14 +78,13 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
 
 ### Running tests
 
-Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
+Use the run button in the IDE's editor gutter, or run tests using Gradle tasks:
 
 - Android tests: `./gradlew :shared:testAndroidHostTest`
-- 拼音库测试（随迁移代码一起带过来的用例）:
+- 拼音库测试:
   - `./gradlew :libs:tinypinyin-kt:jvmTest`
   - `./gradlew :libs:lexicons-cncity:jvmTest`
 - Desktop tests: `./gradlew :shared:jvmTest`
-  （其中 `PinyinVerifierTest` 即“libs 拼音库是否正确 + 转换耗时”的自动化版本，控制台会打印一份完整报告）
 - Web tests:
   - Wasm target: `./gradlew :shared:wasmJsTest`
   - JS target: `./gradlew :shared:jsTest`
@@ -66,9 +92,9 @@ Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 
 ---
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com.cn/en-us/help/kotlin-multiplatform-dev/get-started.html),
+Learn more about [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform-get-started.html),
 [Compose Multiplatform](https://kotlinlang.org/compose-multiplatform/),
-[Kotlin/Wasm](https://kotl.in/wasm/)…
+and [Kotlin/Wasm](https://kotl.in/wasm/).
 
-We would appreciate your feedback on Compose/Web and Kotlin/Wasm in the public Slack channel [#compose-web](https://slack-chats.kotlinlang.org/c/compose-web).
-If you face any issues, please report them on [YouTrack](https://youtrack.jetbrains.com/newIssue?project=CMP).
+For details on the `tinypinyin-kt` / `lexicons-cncity` libraries, the data pipeline,
+and the release process, see [libs/README.md](./libs/README.md).
