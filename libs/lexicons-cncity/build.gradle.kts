@@ -10,6 +10,8 @@ plugins {
 description = "Optional Chinese place-name lexicon for tinypinyin-kt (longest-match polyphone fixes)."
 apply(from = rootProject.file("gradle/jitpack-publishing.gradle.kts"))
 
+val isMacOsX = System.getProperty("os.name").lowercase().contains("mac")
+
 kotlin {
     android {
         namespace = "com.github.kmppy.lexicons.cncity"
@@ -35,11 +37,13 @@ kotlin {
         nodejs()
     }
 
-    iosArm64()
-    iosX64()
-    iosSimulatorArm64()
-    macosArm64()
-    macosX64()
+    if (isMacOsX) {
+        iosArm64()
+        iosX64()
+        iosSimulatorArm64()
+        macosArm64()
+        macosX64()
+    }
 
     sourceSets {
         commonMain {

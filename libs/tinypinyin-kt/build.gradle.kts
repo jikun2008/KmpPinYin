@@ -10,6 +10,8 @@ plugins {
 description = "Fast, low-memory Chinese-to-Pinyin library for Kotlin Multiplatform (TinyPinyin compatible, with tone output and polyphone dictionaries)."
 apply(from = rootProject.file("gradle/jitpack-publishing.gradle.kts"))
 
+val isMacOsX = System.getProperty("os.name").lowercase().contains("mac")
+
 kotlin {
     // All implementation lives in commonMain (pure Kotlin, no expect/actual).
     // These targets only publish the resolved commonMain artifacts.
@@ -39,11 +41,13 @@ kotlin {
         nodejs()
     }
 
-    iosArm64()
-    iosX64()
-    iosSimulatorArm64()
-    macosArm64()
-    macosX64()
+    if (isMacOsX) {
+        iosArm64()
+        iosX64()
+        iosSimulatorArm64()
+        macosArm64()
+        macosX64()
+    }
 
     // 本机为 Windows，开启这两个目标会额外下载 Kotlin/Native 工具链；
     // 需要产出 Linux / Windows 原生库时再放开。

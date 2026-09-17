@@ -8,14 +8,19 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
+val isMacOsX = System.getProperty("os.name").lowercase().contains("mac")
+
 kotlin {
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "Shared"
-            isStatic = true
+    if (isMacOsX) {
+        listOf(
+            iosArm64(),
+            iosX64(),
+            iosSimulatorArm64()
+        ).forEach { iosTarget ->
+            iosTarget.binaries.framework {
+                baseName = "Shared"
+                isStatic = true
+            }
         }
     }
     
